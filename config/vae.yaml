@@ -1,0 +1,28 @@
+model_params:
+  model_name: 'VanillaVAE'
+  in_channels: 1
+  latent_dim: 128
+
+
+data_params:
+  dataset_name: mnist 
+  data_dir: "D:/learnspace/dataset"
+  train_batch_size: 128
+  val_batch_size:  64
+  patch_size: 64
+  num_workers: 0
+
+
+exp_params:
+  LR: 0.005
+  weight_decay: 0.0
+  scheduler_gamma: 0.95
+  kld_weight: 0.00025
+  manual_seed: 1265
+
+trainer_params:
+  device: cpu
+  max_epochs: 100
+  checkpoint_dir: "./checkpoint"
+  log_dir: "logs/"
+  
