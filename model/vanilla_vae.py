@@ -30,6 +30,7 @@ class VanillaVAE(BaseVAE):
             hidden_dims = [32, 64, 128, 256, 512]
 
         # Build Encoder
+        input_in_channels = in_channels
         for h_dim in hidden_dims:
             modules.append(
                 nn.Sequential(
@@ -80,7 +81,7 @@ class VanillaVAE(BaseVAE):
                             nn.BatchNorm2d(hidden_dims[-1]),
                             nn.LeakyReLU(),
                             nn.Conv2d(hidden_dims[-1], 
-                                      out_channels=in_channels,
+                                      out_channels=input_in_channels,
                                       kernel_size= 3, padding= 1),
                             nn.Tanh())
         
@@ -162,7 +163,7 @@ class VanillaVAE(BaseVAE):
 
     def sample(self,
                batch_size:int,
-               device: int, **kwargs) -> Tensor:
+               device, **kwargs) -> Tensor:
         """
         Samples from the latent space and return the corresponding
         image space map.

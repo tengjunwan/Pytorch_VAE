@@ -41,7 +41,8 @@ class VAEExperiment():
         real_imgs, labels = batch
         results = self.forward(real_imgs, labels = labels)
         train_loss = self.model.loss_function(
-            *results, **kwargs)
+            *results, M_N = self.params['kld_weight'], 
+            **kwargs)
         self.optimizer.zero_grad()
         train_loss["loss"].backward()
         self.optimizer.step()
@@ -60,6 +61,16 @@ class VAEExperiment():
                     in val_loss.items()}
         
         return eval_log
+    
+    def on_validation_end(self, batch):
+        with torch.no_grad():
+            real_imgs, labels = batch
+            generate_imgs = self.model.generate(real_imgs)
+            sample_imgs = self.model.sample(real_imgs.shape[0], self.device)
+            
+        return {"generate_imgs": generate_imgs, "sample_imgs": sample_imgs, 
+                "real_imgs": real_imgs}
+        
     
     def get_current_lr(self):
         lr = self.optimizer.param_groups[0]['lr']

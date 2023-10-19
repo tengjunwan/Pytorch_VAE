@@ -25,7 +25,7 @@ with open(config_path, 'r') as file:
         config = yaml.safe_load(file)
     except yaml.YAMLError as exc:
         print(exc)
-        
+
 # load data
 train_dataset, val_dataset = get_dataset(**config["data_params"])
 train_dataloader = DataLoader(
@@ -40,7 +40,7 @@ val_dataloader = DataLoader(
     val_dataset,
     batch_size=config["data_params"]["val_batch_size"],                  
     num_workers=config["data_params"]["num_workers"],
-    shuffle=True,
+    shuffle=False,
     pin_memory=config['trainer_params']['device'] != 'cpu'
     )
 
@@ -49,6 +49,8 @@ model = get_model(**config["model_params"])
 
 # load experiment
 exp = VAEExperiment(model, config["exp_params"])
+
+# l
 
 # trainer
 trainer = Trainer(**config["trainer_params"])

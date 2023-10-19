@@ -8,7 +8,8 @@ Created on Wed Oct 18 12:25:33 2023
 from pathlib import Path
 
 from tqdm import tqdm
-import torch
+import torch 
+from torch.utils.tensorboard import SummaryWriter
 
 
 class Trainer():
@@ -22,41 +23,69 @@ class Trainer():
     def fit(self, experiment, train_loader, val_loader):
         experiment.model.to(self.device)
         experiment.configure_optimizers()
-        
+        experiment.device = self.device
+        tb = SummaryWriter(str(self.log_dir / experiment.params["exp_name"]))
         
         for epoch in range(self.max_epochs):
             current_lr = experiment.get_current_lr()
-            train_progress = tqdm(
-                train_loader, 
-                desc=f"Train:{epoch + 1}/{self.max_epochs}|lr:{current_lr:.3f}")
+            train_progress = tqdm(enumerate(train_loader), 
+                                  total=len(train_loader))
+            train_msg = \
+                f"Train:{epoch + 1}/{self.max_epochs}|lr:{current_lr:.3f}|"
             # train
-            running_tr_loss = []
-            for xs, labels in tqdm(train_loader):
+            running_tr = {}
+            for i, (xs, labels) in train_progress:
                 xs, labels = self._to_device(xs, labels)
                 train_log = experiment.training_step((xs, labels))
-                running_tr_loss.append(train_log["loss"])
-                # print
-                train_msg = [f"{k}:{v:.2f}" for k, v in train_log.items()]
-                train_progress.set_postfix_str("|".join(train_msg))
                 
+                for k, v in train_log.items():
+                    running_tr.setdefault(k, []).append(v)
+                
+                if i % 49 == 0:
+                    for k, v in train_log.items():
+                        tb.add_scalar(k, v, i + epoch * len(train_loader))
+                
+                running_train_msg = "|".join(
+                    f"{k}:{v:.3f}" for k, v in train_log.items())
+                train_progress.set_description(train_msg + running_train_msg)
+
             # val
-            val_progress = tqdm(val_loader, 
-                                desc=f"Epoch {epoch + 1}/Training")
-            running_val_loss = []
+            val_progress = tqdm(val_loader, total=len(val_loader),
+                                desc=f"Val:{epoch + 1}/{self.max_epochs}")
+            running_val = {}
             for xs, labels in val_progress:
                 xs, labels = self._to_device(xs, labels)
                 val_log = experiment.validation_step((xs, labels))
-                running_val_loss.append(val_log["val_loss"])
-                # print
-                val_msg = [f"{k}:{v:.2f}" for k, v in val_log.items()]
-                val_progress.set_postfix_str("|".join(val_msg))
+                for k, v in val_log.items():
+                    running_val.setdefault(k, []).append(v)
+                    
+            # get average
+            for k in running_tr.keys():
+                running_tr[k] = sum(running_tr[k]) / len(running_tr[k])
+            for k in running_val.keys():
+                running_val[k] = sum(running_val[k]) / len(running_val[k])
+                
+            val_msg = "|".join(f"{k}:{v:.3f}" for k, v in running_val.items())
+            print("val result:" + val_msg)
+                
                 
             experiment.scheduler.step()
             
-            average_tr_loss = sum(running_tr_loss) / len(running_tr_loss)
-            average_val_loss = sum(running_val_loss) / len(running_val_loss)
+            for k, v in running_val.items():
+                tb.add_scalar(k, v, epoch)
+                
+            # visualize
+            xs, labels = next(iter(val_loader))
+            xs, labels = self._to_device(xs, labels)
+            vis_result = experiment.on_validation_end((xs, labels))
+            for k, v in vis_result.items():
+                tb.add_images(k, v, global_step=epoch)
+            
             self._save_checkpoint(experiment.model,
-                f"{epoch}_{average_tr_loss:.2f}_{average_val_loss:.2f}.pth")
+                f"epoch: {epoch}_{running_tr['loss']:.3f}"+
+                f"_{running_val['val_loss']:.3f}.pth")
+            
+            tb.close()
             
     
     def _to_device(self, *args):
@@ -74,7 +103,5 @@ class Trainer():
         save_path = self.checkpoint_dir / save_name
         torch.save(model.state_dict(), str(save_path))
         
-    def _log():
-        pass
     
     
